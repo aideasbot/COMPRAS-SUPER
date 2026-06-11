@@ -61,16 +61,13 @@
   /* ── Barra de categorías (dentro del sticky) ── */
   .cat-bar{
     border-top:1px solid rgba(255,255,255,.08);
-    padding:8px 0 9px;
+    padding:8px 14px 10px;
   }
   .cat-bar-inner{
-    display:flex;gap:7px;
-    overflow-x:auto;
-    padding:0 14px;
-    scrollbar-width:none;
-    -webkit-overflow-scrolling:touch;
+    display:flex;
+    flex-wrap:wrap;   /* todas visibles, sin carrusel */
+    gap:7px;
   }
-  .cat-bar-inner::-webkit-scrollbar{display:none}
   .cat-btn{
     flex:none;
     font-family:inherit;font-size:11px;font-weight:700;
@@ -103,9 +100,9 @@
 
   /* ── Items ── */
   .item{
-    display:flex;align-items:center;gap:9px;
-    padding:13px 12px;border-bottom:1px solid var(--line2);
-    transition:background .1s;
+    display:flex;flex-direction:column;
+    padding:12px 12px 10px;border-bottom:1px solid var(--line2);
+    transition:background .1s;gap:8px;
   }
   .item:last-child{border-bottom:none}
   .item.catalogo{background:var(--card)}
@@ -117,12 +114,16 @@
     text-decoration-thickness:1.5px;text-decoration-color:var(--verde-ring);font-weight:400;
   }
 
+  /* Fila superior: check + info + btn-comprar/sacar/eliminar */
+  .item-top{display:flex;align-items:flex-start;gap:9px}
+  /* Fila inferior: chips + valor (solo cuando hay contenido) */
+  .item-bottom{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding-left:41px}
+
   .check{
     flex:none;width:32px;height:32px;border-radius:50%;
     border:2px solid var(--line);background:transparent;
     display:flex;align-items:center;justify-content:center;
-    font-size:14px;color:transparent;cursor:pointer;
-    /* aumentamos el área táctil sin cambiar el visual */
+    font-size:14px;color:transparent;cursor:pointer;margin-top:2px;
     -webkit-tap-highlight-color:transparent;
     transition:all .18s cubic-bezier(.4,0,.2,1);
   }
@@ -487,7 +488,6 @@ function scrollToCategoria(cat, btn){
   window.scrollTo({top, behavior:'smooth'});
   document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('activa'));
   btn.classList.add('activa');
-  btn.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
 }
 
 // Actualizar botón activo según posición de scroll
@@ -502,13 +502,7 @@ function activarCatBtn(){
   });
   if(!activa && secs.length) activa = secs[0].dataset.cat;
   document.querySelectorAll('.cat-btn').forEach(b=>{
-    const esActiva = b.dataset.cat === activa;
-    if(esActiva && !b.classList.contains('activa')){
-      b.classList.add('activa');
-      b.scrollIntoView({behavior:'smooth', block:'nearest', inline:'center'});
-    } else if(!esActiva){
-      b.classList.remove('activa');
-    }
+    b.classList.toggle('activa', b.dataset.cat===activa);
   });
 }
 window.addEventListener('scroll', activarCatBtn, {passive:true});
@@ -531,38 +525,44 @@ function filaItem(p){
       ? `<span class="precio-ref">${fmtPesos(p.valor)}</span>`
       : '';
     div.innerHTML=`
-      <div class="info">
-        <div class="nombre-row"><div class="nombre"></div>${precioRef}</div>
-        <div class="sub">
-          <span class="cat-lbl${catVacia?' vacia':''}"></span>
+      <div class="item-top">
+        <div class="info">
+          <div class="nombre-row"><div class="nombre"></div>${precioRef}</div>
+          <div class="sub"><span class="cat-lbl${catVacia?' vacia':''}"></span></div>
+          <div class="info-actions">
+            <button class="btn-editar-nombre">✏ Renombrar</button>
+            <button class="btn-cat-inline">📂 Categoría</button>
+          </div>
         </div>
-        <div class="info-actions">
-          <button class="btn-editar-nombre">✏ Renombrar</button>
-          <button class="btn-cat-inline">📂 Categoría</button>
-        </div>
-      </div>
-      <button class="btn-comprar">Comprar</button>
-      <button class="btn-eliminar" title="Eliminar">🗑</button>`;
+        <button class="btn-comprar">Comprar</button>
+        <button class="btn-eliminar" title="Eliminar">🗑</button>
+      </div>`;
     div.querySelector('.btn-comprar').onclick=e=>{e.stopPropagation();comprar(p);};
     div.querySelector('.btn-eliminar').onclick=e=>{e.stopPropagation();pedirConfirmEliminar(p);};
     div.querySelector('.btn-editar-nombre').onclick=e=>{e.stopPropagation();abrirModalNombre(p);};
     div.querySelector('.btn-cat-inline').onclick=e=>{e.stopPropagation();abrirModalCategoria(p);};
   } else {
+    // Fila inferior solo si hay algo que mostrar
+    const tieneBottom = listaLabel || fechaCorta || true; // valor siempre presente
     div.innerHTML=`
-      <button class="check" aria-label="Marcar comprado">✓</button>
-      <div class="info">
-        <div class="nombre"></div>
-        <div class="sub"><span class="cat-lbl${catVacia?' vacia':''}"></span></div>
-        <div class="info-actions">
-          <button class="btn-editar-nombre">✏ Renombrar</button>
-          <button class="btn-cat-inline">📂 Categoría</button>
+      <div class="item-top">
+        <button class="check" aria-label="Marcar comprado">✓</button>
+        <div class="info">
+          <div class="nombre"></div>
+          <div class="sub"><span class="cat-lbl${catVacia?' vacia':''}"></span></div>
+          <div class="info-actions">
+            <button class="btn-editar-nombre">✏ Renombrar</button>
+            <button class="btn-cat-inline">📂 Categoría</button>
+          </div>
         </div>
+        <button class="btn-sacar" title="Sacar de lista">×</button>
+        <button class="btn-eliminar" title="Eliminar">🗑</button>
       </div>
-      ${listaLabel?`<div class="chip-lista">${listaLabel}</div>`:''}
-      ${fechaCorta ?`<div class="chip-fecha">${fechaCorta}</div>`:''}
-      <input class="valor" type="number" inputmode="decimal" placeholder="$">
-      <button class="btn-sacar" title="Sacar de lista">×</button>
-      <button class="btn-eliminar" title="Eliminar">🗑</button>`;
+      <div class="item-bottom">
+        ${listaLabel?`<div class="chip-lista">${listaLabel}</div>`:''}
+        ${fechaCorta ?`<div class="chip-fecha">${fechaCorta}</div>`:''}
+        <input class="valor" type="number" inputmode="decimal" placeholder="$ precio">
+      </div>`;
     const inp=div.querySelector('.valor');
     if(p.valor!==null) inp.value=p.valor;
     inp.classList.toggle('historico', p.estado==='P'&&p.valor!==null);
@@ -575,7 +575,6 @@ function filaItem(p){
   }
 
   div.querySelector('.nombre').textContent=p.producto;
-  // cat-lbl puede estar en cualquiera de los dos layouts
   const catLbl = div.querySelector('.cat-lbl');
   if(catLbl) catLbl.textContent=catVacia?'sin categoría · asignar':catTxt;
   return div;
