@@ -1068,57 +1068,15 @@ body {
 </head>
 <body>
 
-<!-- MODAL TECLADO NUMÉRICO -->
-<div class="modal-overlay hidden" id="modal-numpad" onclick="cerrarNumpad(event)">
-  <div class="modal-sheet" onclick="event.stopPropagation()" style="padding:20px 16px 32px;">
-    <div class="modal-title" style="margin-bottom:12px;" id="numpad-title">Monto</div>
-    <div id="numpad-display" style="font-size:36px;font-weight:700;text-align:center;letter-spacing:-0.02em;margin-bottom:16px;min-height:44px;color:var(--text);">0</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
-      <button class="numpad-btn" onclick="numpadPress('7')">7</button>
-      <button class="numpad-btn" onclick="numpadPress('8')">8</button>
-      <button class="numpad-btn" onclick="numpadPress('9')">9</button>
-      <button class="numpad-btn" onclick="numpadPress('4')">4</button>
-      <button class="numpad-btn" onclick="numpadPress('5')">5</button>
-      <button class="numpad-btn" onclick="numpadPress('6')">6</button>
-      <button class="numpad-btn" onclick="numpadPress('1')">1</button>
-      <button class="numpad-btn" onclick="numpadPress('2')">2</button>
-      <button class="numpad-btn" onclick="numpadPress('3')">3</button>
-      <button class="numpad-btn" onclick="numpadPress('.')">.</button>
-      <button class="numpad-btn" onclick="numpadPress('0')">0</button>
-      <button class="numpad-btn numpad-del" onclick="numpadDel()">⌫</button>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:12px;">
-      <button class="modal-cancel" onclick="cerrarNumpad()">Cancelar</button>
-      <button class="modal-confirm" onclick="confirmarNumpad()">Listo</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL CATEGORÍA / SUBCATEGORÍA — full-screen -->
-<div class="modal-fs-overlay hidden" id="modal-cat-picker">
+<!-- WIZARD REGISTRO — único modal full-screen con pasos internos -->
+<div class="modal-fs-overlay hidden" id="modal-wizard">
   <div class="modal-fs-header">
-    <button class="modal-fs-back" onclick="cerrarCatPicker()">‹</button>
-    <div class="modal-fs-title" id="cat-picker-title">Categoría</div>
-    <button class="modal-fs-skip hidden" id="cat-picker-skip" onclick="omitirSubcat()">Omitir</button>
-    <button class="modal-fs-confirm" id="cat-picker-listo" onclick="confirmarCatPicker()">Listo</button>
+    <button class="modal-fs-back" id="wiz-back" onclick="wizBack()">‹</button>
+    <div class="modal-fs-title" id="wiz-title">Monto</div>
+    <button class="modal-fs-skip hidden" id="wiz-skip" onclick="wizSkip()">Omitir</button>
+    <button class="modal-fs-confirm hidden" id="wiz-confirm" onclick="wizConfirm()">Listo</button>
   </div>
-  <div class="modal-fs-search">
-    <input type="text" id="cat-picker-input"
-           placeholder="Buscar o escribir nueva…"
-           oninput="filtrarCatPicker()"
-           autocomplete="off"/>
-  </div>
-  <div class="modal-fs-frecuentes" id="cat-picker-frecuentes"></div>
-  <div class="modal-fs-results" id="cat-picker-results"></div>
-</div>
-
-<!-- MODAL ENTIDAD / DESDE — full-screen -->
-<div class="modal-fs-overlay hidden" id="modal-ent-picker">
-  <div class="modal-fs-header">
-    <button class="modal-fs-back" onclick="cerrarEntPicker()">‹</button>
-    <div class="modal-fs-title">¿Desde dónde?</div>
-  </div>
-  <div class="modal-fs-results" id="ent-picker-chips" style="gap:12px; padding:16px;"></div>
+  <div id="wiz-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;"></div>
 </div>
 
 <!-- MODAL EDITAR NOMBRE CUENTA -->
@@ -1534,241 +1492,247 @@ function setTipo(t) {
   }
 }
 
-// ── TECLADO NUMÉRICO ──────────────────────────────────────────
-let _numpadVal = '';
+// ══════════════════════════════════════════════════════════════
+// WIZARD DE REGISTRO — un único modal full-screen, 4 pasos
+// Pasos: 0=monto, 1=categoría, 2=subcategoría, 3=desde
+// No hay transición entre modales — solo se reescribe wiz-body
+// ══════════════════════════════════════════════════════════════
+let _wizStep = 0;
+let _wizNumVal = '';
+let _wizCatSel = '';
+let _wizSubSel = '';
 
-function abrirNumpad() {
-  const cur = document.getElementById('monto').value;
-  _numpadVal = cur && cur !== '0' ? cur : '';
-  _actualizarNumpadDisplay();
-  document.getElementById('modal-numpad').classList.remove('hidden');
-}
-function cerrarNumpad(evt) {
-  if (evt && evt.target !== document.getElementById('modal-numpad')) return;
-  document.getElementById('modal-numpad').classList.add('hidden');
-}
-function numpadPress(char) {
-  if (char === '.' && _numpadVal.includes('.')) return;
-  if (_numpadVal === '0' && char !== '.') _numpadVal = char;
-  else _numpadVal += char;
-  // Max 2 decimales
-  const parts = _numpadVal.split('.');
-  if (parts[1] && parts[1].length > 2) return;
-  _actualizarNumpadDisplay();
-}
-function numpadDel() {
-  _numpadVal = _numpadVal.slice(0, -1);
-  _actualizarNumpadDisplay();
-}
-function _actualizarNumpadDisplay() {
-  const disp = _numpadVal || '0';
-  document.getElementById('numpad-display').textContent = disp;
-}
-function confirmarNumpad() {
-  const val = parseFloat(_numpadVal);
-  if (!_numpadVal || isNaN(val) || val <= 0) { toast('Ingresá un monto válido'); return; }
-  document.getElementById('monto').value = val;
-  const trigger = document.getElementById('monto-trigger');
-  trigger.querySelector('span').textContent = '$ ' + fmt(val);
-  trigger.classList.add('filled');
-  document.getElementById('modal-numpad').classList.add('hidden');
-  // Flujo progresivo: siguiente paso → categoría
-  _irA(() => abrirCatPicker('cat'));
-}
-
-// ── FLUJO PROGRESIVO: transición entre modales ────────────────
-// Cierra todos los modales posibles y espera 200ms para que el
-// navegador móvil procese el cierre antes de abrir el siguiente.
-function _cerrarTodo() {
-  ['modal-numpad','modal-cat-picker','modal-ent-picker',
-   'modal-traspaso','modal-rename'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.add('hidden');
-  });
-}
-function _irA(fn) {
-  _cerrarTodo();
-  setTimeout(fn, 200);
-}
-
-// ── PICKER CATEGORÍA / SUBCATEGORÍA ──────────────────────────
-let _catPickerMode = 'cat'; // 'cat' | 'subcat'
-let _catPickerSeleccion = '';
-
-function _top5(arr) {
-  // Contar frecuencia de uso en movimientos
+function _wizTop5(arr, modeKey) {
   const freq = {};
   allMovs.forEach(m => {
-    const key = _catPickerMode === 'cat' ? m.categoria : m.subcategoria;
-    if (key) freq[key] = (freq[key] || 0) + 1;
+    const k = modeKey === 'cat' ? m.categoria : m.subcategoria;
+    if (k) freq[k] = (freq[k] || 0) + 1;
   });
-  return arr
-    .filter(v => v)
-    .sort((a, b) => (freq[b] || 0) - (freq[a] || 0))
-    .slice(0, 5);
+  return arr.filter(v => v).sort((a, b) => (freq[b]||0)-(freq[a]||0)).slice(0, 5);
 }
 
-function abrirCatPicker(mode) {
-  _catPickerMode = mode;
-  _catPickerSeleccion = mode === 'cat'
-    ? document.getElementById('categoria').value
-    : document.getElementById('subcategoria').value;
-
-  document.getElementById('cat-picker-title').textContent =
-    mode === 'cat' ? 'Categoría' : 'Subcategoría';
-  document.getElementById('cat-picker-input').value = '';
-
-  const cat = document.getElementById('categoria').value.trim();
-  const opciones = mode === 'cat' ? allCats : (subcatMap[cat] || []);
-  const frecuentes = _top5(opciones);
-
-  // Frecuentes
-  const frecDiv = document.getElementById('cat-picker-frecuentes');
-  if (frecuentes.length) {
-    frecDiv.innerHTML = `<div class="freq-label">Más usadas</div>
-      <div class="chips-row">${frecuentes.map(v =>
-        `<button class="chip${v === _catPickerSeleccion ? ' selected' : ''}"
-           onclick="seleccionarChipCat('${v.replace(/'/g,"\\'")}')">
-           ${v}
-         </button>`).join('')}
-      </div>`;
-  } else {
-    frecDiv.innerHTML = '';
-  }
-
-  // Resultados iniciales (todas)
-  _renderCatPickerResults(opciones);
-
-  // Mostrar "Omitir" solo en subcategoría (es opcional)
-  document.getElementById('cat-picker-skip').classList.toggle('hidden', mode !== 'subcat');
-
-  document.getElementById('modal-cat-picker').classList.remove('hidden');
-  // Sin auto-focus en móvil: el teclado puede interferir con la transición entre modales
-  // El usuario puede tocar el campo si quiere buscar
+function abrirNumpad() {
+  _wizStep = 0;
+  _wizNumVal = document.getElementById('monto').value || '';
+  if (_wizNumVal === '0') _wizNumVal = '';
+  document.getElementById('modal-wizard').classList.remove('hidden');
+  _wizRender();
 }
 
-function _renderCatPickerResults(lista) {
-  const sel = _catPickerSeleccion;
-  document.getElementById('cat-picker-results').innerHTML = lista.map(v =>
-    `<button class="chip${v === sel ? ' selected' : ''}"
-       onclick="seleccionarChipCat('${v.replace(/'/g,"\\'")}')">
-       ${v}
-     </button>`).join('');
-}
-
-function filtrarCatPicker() {
-  const val = document.getElementById('cat-picker-input').value.toLowerCase();
-  const cat = document.getElementById('categoria').value.trim();
-  const opciones = _catPickerMode === 'cat' ? allCats : (subcatMap[cat] || []);
-  const filtrado = opciones.filter(v => v.toLowerCase().includes(val));
-  _renderCatPickerResults(filtrado);
-}
-
-function seleccionarChipCat(v) {
-  _catPickerSeleccion = v;
-  // Actualizar estado visual chips
-  document.querySelectorAll('#cat-picker-frecuentes .chip, #cat-picker-results .chip')
-    .forEach(c => c.classList.toggle('selected', c.textContent.trim() === v));
-}
-
-function confirmarCatPicker() {
-  const inputVal = document.getElementById('cat-picker-input').value.trim();
-  const val = _catPickerSeleccion || inputVal;
-  if (!val) { cerrarCatPicker(); return; }
-
-  if (_catPickerMode === 'cat') {
-    document.getElementById('categoria').value = val;
-    const t = document.getElementById('cat-trigger');
-    t.querySelector('span').textContent = val;
-    t.classList.add('filled');
-    // Reset subcat
-    document.getElementById('subcategoria').value = '';
-    const ts = document.getElementById('subcat-trigger');
-
-    ts.querySelector('span').textContent = 'Seleccioná o escribí…';
-    ts.querySelector('span').style.color = 'var(--muted)';
-    ts.classList.remove('filled');
-    // Flujo progresivo: siguiente → subcategoría
-    cerrarCatPicker();
-    _irA(() => abrirCatPicker('subcat'));
-    return;
-  } else {
-    document.getElementById('subcategoria').value = val;
-    const t = document.getElementById('subcat-trigger');
-    t.querySelector('span').textContent = val;
-    t.classList.add('filled');
-    // Flujo progresivo: siguiente → entidad (desde)
-    cerrarCatPicker();
-    _irA(() => abrirEntPicker());
+function wizBack() {
+  if (_wizStep === 0) {
+    document.getElementById('modal-wizard').classList.add('hidden');
     return;
   }
-  cerrarCatPicker();
+  _wizStep--;
+  _wizRender();
 }
 
-function omitirSubcat() {
-  // Limpia subcategoría y avanza al siguiente paso (entidad)
+function wizSkip() {
+  // Solo disponible en paso 2 (subcategoría)
+  _wizSubSel = '';
   document.getElementById('subcategoria').value = '';
   const ts = document.getElementById('subcat-trigger');
   ts.querySelector('span').textContent = 'Seleccioná o escribí…';
   ts.querySelector('span').style.color = 'var(--muted)';
   ts.classList.remove('filled');
-  cerrarCatPicker();
-  _irA(() => abrirEntPicker());
+  _wizStep = 3;
+  _wizRender();
 }
 
-function cerrarCatPicker(evt) {
-  _catPickerSeleccion = '';
-  document.getElementById('modal-cat-picker').classList.add('hidden');
+function wizConfirm() {
+  if (_wizStep === 0) _wizConfirmarMonto();
+  else if (_wizStep === 1) _wizConfirmarCat();
+  else if (_wizStep === 2) _wizConfirmarSubcat();
 }
 
-// ── PICKER ENTIDAD / DESDE ────────────────────────────────────
-function abrirEntPicker() {
-  const selActual = document.getElementById('entidad').value;
-  const chips = document.getElementById('ent-picker-chips');
-
-  chips.innerHTML = allBalances.length
-    ? allBalances.map(b => {
-        const saldo = b.saldoActual || 0;
-        const esc = b.cuenta.replace(/'/g,"\\'");
-        return `<button class="ent-chip${b.cuenta === selActual ? ' selected' : ''}"
-                  onclick="seleccionarEntidad('${esc}', this)">
-                  <span>${b.cuenta}</span>
-                  <span class="ent-chip-saldo">$ ${fmt(saldo)}</span>
-                </button>`;
-      }).join('')
-    : allBancos.map(b => {
-        const esc = b.replace(/'/g,"\\'");
-        return `<button class="ent-chip${b === selActual ? ' selected' : ''}"
-                  onclick="seleccionarEntidad('${esc}', this)">
-                  <span>${b}</span>
-                </button>`;
-      }).join('');
-
-  document.getElementById('modal-ent-picker').classList.remove('hidden');
+function _wizConfirmarMonto() {
+  const val = parseFloat(_wizNumVal);
+  if (!_wizNumVal || isNaN(val) || val <= 0) { toast('Ingresá un monto válido'); return; }
+  document.getElementById('monto').value = val;
+  const trigger = document.getElementById('monto-trigger');
+  trigger.querySelector('span').textContent = '$ ' + fmt(val);
+  trigger.classList.add('filled');
+  _wizStep = 1;
+  _wizCatSel = document.getElementById('categoria').value || '';
+  _wizRender();
 }
 
-function seleccionarEntidad(nombre, btn) {
-  document.querySelectorAll('#ent-picker-chips .ent-chip').forEach(c => c.classList.remove('selected'));
+function _wizConfirmarCat() {
+  const inputEl = document.getElementById('wiz-search-input');
+  const inputVal = inputEl ? inputEl.value.trim() : '';
+  const val = _wizCatSel || inputVal;
+  if (!val) { toast('Seleccioná o escribí una categoría'); return; }
+  document.getElementById('categoria').value = val;
+  const t = document.getElementById('cat-trigger');
+  t.querySelector('span').textContent = val;
+  t.classList.add('filled');
+  // Reset subcat
+  document.getElementById('subcategoria').value = '';
+  const ts = document.getElementById('subcat-trigger');
+  ts.querySelector('span').textContent = 'Seleccioná o escribí…';
+  ts.querySelector('span').style.color = 'var(--muted)';
+  ts.classList.remove('filled');
+  _wizStep = 2;
+  _wizSubSel = '';
+  _wizRender();
+}
+
+function _wizConfirmarSubcat() {
+  const inputEl = document.getElementById('wiz-search-input');
+  const inputVal = inputEl ? inputEl.value.trim() : '';
+  const val = _wizSubSel || inputVal;
+  if (!val) { toast('Seleccioná o escribí una subcategoría'); return; }
+  document.getElementById('subcategoria').value = val;
+  const t = document.getElementById('subcat-trigger');
+  t.querySelector('span').textContent = val;
+  t.classList.add('filled');
+  _wizStep = 3;
+  _wizRender();
+}
+
+function _wizRender() {
+  const title = document.getElementById('wiz-title');
+  const skip  = document.getElementById('wiz-skip');
+  const confirm = document.getElementById('wiz-confirm');
+  const body  = document.getElementById('wiz-body');
+
+  skip.classList.add('hidden');
+  confirm.classList.remove('hidden');
+
+  if (_wizStep === 0) {
+    // ── PASO 0: MONTO (numpad) ──
+    title.textContent = 'Monto';
+    body.innerHTML = `
+      <div style="padding:24px 16px 0; text-align:center;">
+        <div id="wiz-numpad-display" style="font-size:48px;font-weight:700;letter-spacing:-0.03em;min-height:60px;color:var(--text);margin-bottom:20px;">${_wizNumVal || '0'}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:320px;margin:0 auto;">
+          ${['7','8','9','4','5','6','1','2','3','.','0','⌫'].map(k =>
+            `<button class="numpad-btn${k==='⌫'?' numpad-del':''}" ontouchstart="_wizNumPress('${k}')" onclick="_wizNumPress('${k}')">${k}</button>`
+          ).join('')}
+        </div>
+      </div>`;
+
+  } else if (_wizStep === 1 || _wizStep === 2) {
+    // ── PASO 1: CATEGORÍA  /  PASO 2: SUBCATEGORÍA ──
+    const isSubcat = _wizStep === 2;
+    title.textContent = isSubcat ? 'Subcategoría' : 'Categoría';
+    if (isSubcat) skip.classList.remove('hidden');
+
+    const cat = document.getElementById('categoria').value.trim();
+    const opciones = isSubcat ? (subcatMap[cat] || []) : allCats;
+    const frecuentes = _wizTop5(opciones, isSubcat ? 'subcat' : 'cat');
+    const selActual  = isSubcat ? _wizSubSel : _wizCatSel;
+
+    const frecHTML = frecuentes.length ? `
+      <div class="freq-label" style="padding:0 16px;margin-top:16px;">Más usadas</div>
+      <div class="chips-row" style="padding:8px 16px 0;">
+        ${frecuentes.map(v => `<button class="chip${v===selActual?' selected':''}" ontouchstart="_wizSelChip('${v.replace(/'/g,"\\'")}')" onclick="_wizSelChip('${v.replace(/'/g,"\\'")}')"> ${v} </button>`).join('')}
+      </div>` : '';
+
+    const todasHTML = opciones.length ? `
+      <div class="freq-label" style="padding:0 16px;margin-top:16px;">Todas</div>
+      <div id="wiz-results" class="chips-row" style="padding:8px 16px 24px;">
+        ${opciones.map(v => `<button class="chip${v===selActual?' selected':''}" ontouchstart="_wizSelChip('${v.replace(/'/g,"\\'")}')" onclick="_wizSelChip('${v.replace(/'/g,"\\'")}')"> ${v} </button>`).join('')}
+      </div>` : '';
+
+    body.innerHTML = `
+      <div style="padding:12px 16px 8px;flex-shrink:0;">
+        <input id="wiz-search-input" type="text" autocomplete="off"
+          placeholder="Buscar o escribir nueva…"
+          oninput="_wizFiltrar()"
+          style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:11px 14px;font-size:16px;font-family:inherit;color:var(--text);outline:none;"/>
+      </div>
+      ${frecHTML}
+      ${todasHTML}`;
+
+  } else if (_wizStep === 3) {
+    // ── PASO 3: DESDE (entidad) ──
+    title.textContent = '¿Desde dónde?';
+    confirm.classList.add('hidden');
+    const selActual = document.getElementById('entidad').value;
+    body.innerHTML = `
+      <div style="padding:16px;display:flex;flex-wrap:wrap;gap:12px;">
+        ${allBalances.map(b => {
+          const saldo = b.saldoActual || 0;
+          const esc   = b.cuenta.replace(/'/g,"\\'");
+          return `<button class="ent-chip${b.cuenta===selActual?' selected':''}"
+            ontouchstart="_wizSelEnt('${esc}',this)" onclick="_wizSelEnt('${esc}',this)">
+            <span>${b.cuenta}</span>
+            <span class="ent-chip-saldo">$ ${fmt(saldo)}</span>
+          </button>`;
+        }).join('')}
+      </div>`;
+  }
+}
+
+function _wizNumPress(k) {
+  if (k === '⌫') { _wizNumVal = _wizNumVal.slice(0,-1); }
+  else if (k === '.' && _wizNumVal.includes('.')) { /* nada */ }
+  else { _wizNumVal += k; }
+  const d = document.getElementById('wiz-numpad-display');
+  if (d) d.textContent = _wizNumVal || '0';
+}
+
+function _wizSelChip(v) {
+  if (_wizStep === 1) _wizCatSel = v;
+  else _wizSubSel = v;
+  // Marcar selected visualmente
+  document.querySelectorAll('#wiz-body .chip').forEach(c =>
+    c.classList.toggle('selected', c.textContent.trim() === v));
+}
+
+function _wizFiltrar() {
+  const inp = document.getElementById('wiz-search-input');
+  const q   = inp ? inp.value.toLowerCase() : '';
+  const cat = document.getElementById('categoria').value.trim();
+  const opciones = _wizStep === 2 ? (subcatMap[cat]||[]) : allCats;
+  const filtrado  = q ? opciones.filter(v => v.toLowerCase().includes(q)) : opciones;
+  const selActual = _wizStep === 2 ? _wizSubSel : _wizCatSel;
+  const res = document.getElementById('wiz-results');
+  if (res) res.innerHTML = filtrado.map(v =>
+    `<button class="chip${v===selActual?' selected':''}" ontouchstart="_wizSelChip('${v.replace(/'/g,"\\'")}')" onclick="_wizSelChip('${v.replace(/'/g,"\\'")}')"> ${v} </button>`).join('');
+}
+
+function _wizSelEnt(nombre, btn) {
+  document.querySelectorAll('#wiz-body .ent-chip').forEach(c => c.classList.remove('selected'));
   btn.classList.add('selected');
   document.getElementById('entidad').value = nombre;
   const t = document.getElementById('ent-trigger');
   t.querySelector('span').textContent = nombre;
   t.classList.add('filled');
-  // Cierra inmediatamente — es el último paso del flujo progresivo
-  _irA(() => cerrarEntPicker());
+  // Último paso: cerrar wizard
+  setTimeout(() => {
+    document.getElementById('modal-wizard').classList.add('hidden');
+  }, 180);
 }
 
-function cerrarEntPicker(evt) {
-  document.getElementById('modal-ent-picker').classList.add('hidden');
+// Funciones legacy que otros botones del form siguen llamando
+function abrirCatPicker(mode) {
+  _wizStep = mode === 'subcat' ? 2 : 1;
+  if (mode === 'cat') _wizCatSel = document.getElementById('categoria').value || '';
+  else _wizSubSel = document.getElementById('subcategoria').value || '';
+  document.getElementById('modal-wizard').classList.remove('hidden');
+  _wizRender();
 }
+function abrirEntPicker() {
+  _wizStep = 3;
+  document.getElementById('modal-wizard').classList.remove('hidden');
+  _wizRender();
+}
+function cerrarCatPicker() { document.getElementById('modal-wizard').classList.add('hidden'); }
+function cerrarEntPicker() { document.getElementById('modal-wizard').classList.add('hidden'); }
+function cerrarNumpad()    { document.getElementById('modal-wizard').classList.add('hidden'); }
 
-// stubs vacíos para compatibilidad (los inputs ahora son hidden)
-function filterCat() {}
-function hideAc() {}
-function filterSubcat() {}
-function hideSubAc() {}
-function filterEntidad() {}
-function hideEntAc() {}
+// stubs vacíos para compatibilidad
+function filterCat() {} function hideAc() {}
+function filterSubcat() {} function hideSubAc() {}
+function filterEntidad() {} function hideEntAc() {}
+function _irA(fn) { fn(); }
+function _cerrarTodo() { document.getElementById('modal-wizard').classList.add('hidden'); }
+function omitirSubcat() { wizSkip(); }
+function confirmarCatPicker() { wizConfirm(); }
+function confirmarNumpad() { wizConfirm(); }
 
 // ── FORMATO NÚMERO ────────────────────────────────────────────
 function fmt(n) {
