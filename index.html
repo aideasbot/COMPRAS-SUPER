@@ -6,7 +6,7 @@
 <title>Control de Gastos</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 
 :root {
   --bg:        #f5f5f7;
@@ -1577,15 +1577,18 @@ function confirmarNumpad() {
 }
 
 // ── FLUJO PROGRESIVO: transición entre modales ────────────────
-// Usa doble rAF para garantizar que el DOM cierre el modal actual
-// antes de abrir el siguiente — crítico en móvil donde display:none
-// y display:flex pueden procesarse en el mismo frame.
-function _irA(fn) {
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      fn();
-    });
+// Cierra todos los modales posibles y espera 200ms para que el
+// navegador móvil procese el cierre antes de abrir el siguiente.
+function _cerrarTodo() {
+  ['modal-numpad','modal-cat-picker','modal-ent-picker',
+   'modal-traspaso','modal-rename'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
   });
+}
+function _irA(fn) {
+  _cerrarTodo();
+  setTimeout(fn, 200);
 }
 
 // ── PICKER CATEGORÍA / SUBCATEGORÍA ──────────────────────────
