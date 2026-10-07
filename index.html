@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, interactive-widget=resizes-content"/>
 <title>Control de Gastos</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
@@ -910,14 +910,18 @@ body {
   box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
 }
 
-/* ── MODAL FULL-SCREEN (categoría / subcategoría) ── */
+/* ── MODAL FULL-SCREEN (wizard) ── */
 .modal-fs-overlay {
   position: fixed;
-  inset: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   background: var(--white);
   z-index: 300;
   display: flex;
   flex-direction: column;
+  /* Evita que el viewport se achique con el teclado en iOS */
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
 .modal-fs-overlay.hidden { display: none; }
 .modal-fs-header {
@@ -927,6 +931,7 @@ body {
   padding: 16px 16px 12px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  background: var(--white);
 }
 .modal-fs-back {
   background: none;
@@ -937,6 +942,7 @@ body {
   cursor: pointer;
   padding: 4px 6px;
   border-radius: 8px;
+  min-width: 32px;
 }
 .modal-fs-title {
   font-size: 17px;
@@ -953,6 +959,7 @@ body {
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+  min-width: 60px;
 }
 .modal-fs-skip {
   background: none;
@@ -965,6 +972,20 @@ body {
   font-family: inherit;
 }
 .modal-fs-skip.hidden { display: none; }
+/* Contenedor de chips scrolleable */
+.wiz-chips-scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 16px;
+}
+/* Buscador fijo abajo — queda visible sobre el teclado */
+.wiz-search-bar {
+  flex-shrink: 0;
+  padding: 10px 16px;
+  background: var(--white);
+  border-top: 1px solid var(--border);
+}
 .modal-fs-search {
   flex-shrink: 0;
   padding: 12px 16px 8px;
@@ -1071,12 +1092,18 @@ body {
 <!-- WIZARD REGISTRO — único modal full-screen con pasos internos -->
 <div class="modal-fs-overlay hidden" id="modal-wizard">
   <div class="modal-fs-header">
-    <button class="modal-fs-back" id="wiz-back" onclick="wizBack()">‹</button>
+    <button class="modal-fs-back" id="wiz-back"
+      ontouchstart="event.preventDefault();wizBack()"
+      onclick="wizBack()">‹</button>
     <div class="modal-fs-title" id="wiz-title">Monto</div>
-    <button class="modal-fs-skip hidden" id="wiz-skip" onclick="wizSkip()">Omitir</button>
-    <button class="modal-fs-confirm hidden" id="wiz-confirm" onclick="wizConfirm()">Listo</button>
+    <button class="modal-fs-skip hidden" id="wiz-skip"
+      ontouchstart="event.preventDefault();wizSkip()"
+      onclick="wizSkip()">Omitir</button>
+    <button class="modal-fs-confirm hidden" id="wiz-confirm"
+      ontouchstart="event.preventDefault();wizConfirm()"
+      onclick="wizConfirm()">Listo</button>
   </div>
-  <div id="wiz-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;"></div>
+  <div id="wiz-body" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;overflow-x:hidden;"></div>
 </div>
 
 <!-- MODAL EDITAR NOMBRE CUENTA -->
@@ -1515,7 +1542,7 @@ function abrirNumpad() {
   _wizStep = 0;
   _wizNumVal = document.getElementById('monto').value || '';
   if (_wizNumVal === '0') _wizNumVal = '';
-  document.getElementById('modal-wizard').classList.remove('hidden');
+  _wizAbrir();
   _wizRender();
 }
 
@@ -1592,76 +1619,100 @@ function _wizConfirmarSubcat() {
 }
 
 function _wizRender() {
-  const title = document.getElementById('wiz-title');
-  const skip  = document.getElementById('wiz-skip');
+  const title   = document.getElementById('wiz-title');
+  const skip    = document.getElementById('wiz-skip');
   const confirm = document.getElementById('wiz-confirm');
-  const body  = document.getElementById('wiz-body');
+  const body    = document.getElementById('wiz-body');
 
+  // Reset header buttons
   skip.classList.add('hidden');
-  confirm.classList.remove('hidden');
+  confirm.classList.add('hidden'); // oculto por defecto; se muestra solo cuando hace falta
 
   if (_wizStep === 0) {
-    // ── PASO 0: MONTO (numpad) ──
+    // ── PASO 0: MONTO (numpad — sin input nativo, sin teclado) ──
     title.textContent = 'Monto';
+    confirm.classList.remove('hidden');
+    body.style.flexDirection = 'column';
     body.innerHTML = `
-      <div style="padding:24px 16px 0; text-align:center;">
-        <div id="wiz-numpad-display" style="font-size:48px;font-weight:700;letter-spacing:-0.03em;min-height:60px;color:var(--text);margin-bottom:20px;">${_wizNumVal || '0'}</div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:320px;margin:0 auto;">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 16px 16px;">
+        <div id="wiz-numpad-display" style="font-size:52px;font-weight:700;letter-spacing:-0.03em;min-height:64px;color:var(--text);margin-bottom:24px;text-align:center;width:100%;">${_wizNumVal || '0'}</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;max-width:320px;">
           ${['7','8','9','4','5','6','1','2','3','.','0','⌫'].map(k =>
-            `<button class="numpad-btn${k==='⌫'?' numpad-del':''}" ontouchstart="_wizNumPress('${k}')" onclick="_wizNumPress('${k}')">${k}</button>`
+            `<button class="numpad-btn${k==='⌫'?' numpad-del':''}"
+              ontouchstart="event.preventDefault();_wizNumPress('${k}')"
+              onclick="_wizNumPress('${k}')">${k}</button>`
           ).join('')}
         </div>
       </div>`;
 
   } else if (_wizStep === 1 || _wizStep === 2) {
     // ── PASO 1: CATEGORÍA  /  PASO 2: SUBCATEGORÍA ──
+    // Layout: chips arriba (scroll), buscador fijo abajo
+    // Al tocar chip → avanza automáticamente (sin "Listo")
     const isSubcat = _wizStep === 2;
     title.textContent = isSubcat ? 'Subcategoría' : 'Categoría';
     if (isSubcat) skip.classList.remove('hidden');
+    // "Listo" aparece solo cuando hay texto custom en el buscador
+    body.style.flexDirection = 'column';
 
-    const cat = document.getElementById('categoria').value.trim();
+    const cat      = document.getElementById('categoria').value.trim();
     const opciones = isSubcat ? (subcatMap[cat] || []) : allCats;
     const frecuentes = _wizTop5(opciones, isSubcat ? 'subcat' : 'cat');
     const selActual  = isSubcat ? _wizSubSel : _wizCatSel;
 
+    const chipBtn = (v) => {
+      const esc = v.replace(/'/g,"\\'");
+      const sel = v === selActual ? ' selected' : '';
+      // ontouchstart con preventDefault evita el doble disparo
+      return `<button class="chip${sel}"
+        ontouchstart="event.preventDefault();_wizSelChipAuto('${esc}')"
+        onclick="_wizSelChipAuto('${esc}')">${v}</button>`;
+    };
+
     const frecHTML = frecuentes.length ? `
       <div class="freq-label" style="padding:0 16px;margin-top:16px;">Más usadas</div>
-      <div class="chips-row" style="padding:8px 16px 0;">
-        ${frecuentes.map(v => `<button class="chip${v===selActual?' selected':''}" ontouchstart="_wizSelChip('${v.replace(/'/g,"\\'")}')" onclick="_wizSelChip('${v.replace(/'/g,"\\'")}')"> ${v} </button>`).join('')}
+      <div class="chips-row" style="padding:8px 16px 0;flex-wrap:wrap;">
+        ${frecuentes.map(chipBtn).join('')}
       </div>` : '';
 
     const todasHTML = opciones.length ? `
-      <div class="freq-label" style="padding:0 16px;margin-top:16px;">Todas</div>
-      <div id="wiz-results" class="chips-row" style="padding:8px 16px 24px;">
-        ${opciones.map(v => `<button class="chip${v===selActual?' selected':''}" ontouchstart="_wizSelChip('${v.replace(/'/g,"\\'")}')" onclick="_wizSelChip('${v.replace(/'/g,"\\'")}')"> ${v} </button>`).join('')}
+      <div class="freq-label" style="padding:0 16px;margin-top:12px;">Todas</div>
+      <div id="wiz-results" class="chips-row" style="padding:8px 16px 24px;flex-wrap:wrap;">
+        ${opciones.map(chipBtn).join('')}
       </div>` : '';
 
     body.innerHTML = `
-      <div style="padding:12px 16px 8px;flex-shrink:0;">
-        <input id="wiz-search-input" type="text" autocomplete="off"
-          placeholder="Buscar o escribir nueva…"
+      <div class="wiz-chips-scroll">
+        ${frecHTML}
+        ${todasHTML}
+      </div>
+      <div class="wiz-search-bar">
+        <input id="wiz-search-input" type="text" autocomplete="off" autocorrect="off"
+          spellcheck="false"
+          placeholder="O escribí una nueva…"
           oninput="_wizFiltrar()"
           style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:11px 14px;font-size:16px;font-family:inherit;color:var(--text);outline:none;"/>
-      </div>
-      ${frecHTML}
-      ${todasHTML}`;
+      </div>`;
 
   } else if (_wizStep === 3) {
-    // ── PASO 3: DESDE (entidad) ──
+    // ── PASO 3: DESDE (entidad) ── toca chip → cierra directo
     title.textContent = '¿Desde dónde?';
-    confirm.classList.add('hidden');
+    body.style.flexDirection = 'column';
     const selActual = document.getElementById('entidad').value;
     body.innerHTML = `
-      <div style="padding:16px;display:flex;flex-wrap:wrap;gap:12px;">
-        ${allBalances.map(b => {
-          const saldo = b.saldoActual || 0;
-          const esc   = b.cuenta.replace(/'/g,"\\'");
-          return `<button class="ent-chip${b.cuenta===selActual?' selected':''}"
-            ontouchstart="_wizSelEnt('${esc}',this)" onclick="_wizSelEnt('${esc}',this)">
-            <span>${b.cuenta}</span>
-            <span class="ent-chip-saldo">$ ${fmt(saldo)}</span>
-          </button>`;
-        }).join('')}
+      <div class="wiz-chips-scroll" style="padding:16px;">
+        <div style="display:flex;flex-wrap:wrap;gap:12px;">
+          ${allBalances.map(b => {
+            const saldo = b.saldoActual || 0;
+            const esc   = b.cuenta.replace(/'/g,"\\'");
+            return `<button class="ent-chip${b.cuenta===selActual?' selected':''}"
+              ontouchstart="event.preventDefault();_wizSelEnt('${esc}',this)"
+              onclick="_wizSelEnt('${esc}',this)">
+              <span>${b.cuenta}</span>
+              <span class="ent-chip-saldo">$ ${fmt(saldo)}</span>
+            </button>`;
+          }).join('')}
+        </div>
       </div>`;
   }
 }
@@ -1674,10 +1725,23 @@ function _wizNumPress(k) {
   if (d) d.textContent = _wizNumVal || '0';
 }
 
+// Selecciona chip y avanza automáticamente al siguiente paso
+function _wizSelChipAuto(v) {
+  if (_wizStep === 1) {
+    _wizCatSel = v;
+    // Avanzar automáticamente a subcategoría
+    setTimeout(() => _wizConfirmarCat(), 120);
+  } else if (_wizStep === 2) {
+    _wizSubSel = v;
+    // Avanzar automáticamente a desde
+    setTimeout(() => _wizConfirmarSubcat(), 120);
+  }
+}
+
+// Selecciona chip sin avanzar (para compatibilidad interna)
 function _wizSelChip(v) {
   if (_wizStep === 1) _wizCatSel = v;
   else _wizSubSel = v;
-  // Marcar selected visualmente
   document.querySelectorAll('#wiz-body .chip').forEach(c =>
     c.classList.toggle('selected', c.textContent.trim() === v));
 }
@@ -1690,8 +1754,19 @@ function _wizFiltrar() {
   const filtrado  = q ? opciones.filter(v => v.toLowerCase().includes(q)) : opciones;
   const selActual = _wizStep === 2 ? _wizSubSel : _wizCatSel;
   const res = document.getElementById('wiz-results');
-  if (res) res.innerHTML = filtrado.map(v =>
-    `<button class="chip${v===selActual?' selected':''}" ontouchstart="_wizSelChip('${v.replace(/'/g,"\\'")}')" onclick="_wizSelChip('${v.replace(/'/g,"\\'")}')"> ${v} </button>`).join('');
+  if (res) res.innerHTML = filtrado.map(v => {
+    const esc = v.replace(/'/g,"\\'");
+    return `<button class="chip${v===selActual?' selected':''}"
+      ontouchstart="event.preventDefault();_wizSelChipAuto('${esc}')"
+      onclick="_wizSelChipAuto('${esc}')">${v}</button>`;
+  }).join('');
+  // Mostrar botón "Listo" si hay texto custom (no coincide exacto con ninguna opción)
+  const exactMatch = opciones.some(v => v.toLowerCase() === q);
+  const confirm = document.getElementById('wiz-confirm');
+  if (confirm) {
+    if (q && !exactMatch) confirm.classList.remove('hidden');
+    else confirm.classList.add('hidden');
+  }
 }
 
 function _wizSelEnt(nombre, btn) {
@@ -1708,16 +1783,23 @@ function _wizSelEnt(nombre, btn) {
 }
 
 // Funciones legacy que otros botones del form siguen llamando
+function _wizAbrir() {
+  const wiz = document.getElementById('modal-wizard');
+  wiz.style.top = '';
+  wiz.style.height = '';
+  wiz.style.bottom = '';
+  wiz.classList.remove('hidden');
+}
 function abrirCatPicker(mode) {
   _wizStep = mode === 'subcat' ? 2 : 1;
   if (mode === 'cat') _wizCatSel = document.getElementById('categoria').value || '';
   else _wizSubSel = document.getElementById('subcategoria').value || '';
-  document.getElementById('modal-wizard').classList.remove('hidden');
+  _wizAbrir();
   _wizRender();
 }
 function abrirEntPicker() {
   _wizStep = 3;
-  document.getElementById('modal-wizard').classList.remove('hidden');
+  _wizAbrir();
   _wizRender();
 }
 function cerrarCatPicker() { document.getElementById('modal-wizard').classList.add('hidden'); }
@@ -2934,6 +3016,23 @@ function toast(msg) {
   el.classList.add('show');
   clearTimeout(toastT);
   toastT = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+// ── FIX TECLADO VIRTUAL (iOS Safari / Android Chrome) ──────────
+// Cuando el teclado aparece, el visualViewport se achica.
+// Ajustamos el wizard para que siempre ocupe el viewport visible.
+if (window.visualViewport) {
+  function _wizAjustarViewport() {
+    const wiz = document.getElementById('modal-wizard');
+    if (!wiz || wiz.classList.contains('hidden')) return;
+    const h = window.visualViewport.height;
+    const t = window.visualViewport.offsetTop;
+    wiz.style.top    = t + 'px';
+    wiz.style.height = h + 'px';
+    wiz.style.bottom = 'auto';
+  }
+  window.visualViewport.addEventListener('resize', _wizAjustarViewport);
+  window.visualViewport.addEventListener('scroll', _wizAjustarViewport);
 }
 </script>
 </body>
